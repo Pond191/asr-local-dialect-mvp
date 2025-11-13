@@ -1,0 +1,20 @@
+# Python
+backend/.venv/
+__pycache__/
+*.pyc
+
+# Node
+frontend/node_modules/
+npm-debug.log*
+yarn.lock
+pnpm-lock.yaml
+
+# Models / cache / audio
+models/
+*.mp3
+*.wav
+*.m4a
+*.mp4
+*.log
+*.tmp
+*.cache
