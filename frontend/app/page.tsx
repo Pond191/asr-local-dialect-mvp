@@ -8,16 +8,13 @@ type ApiResp = {
   files?: { srt?: string; vtt?: string }
 }
 
-/** แปลงวินาที -> เวลาแบบ h:mm:ss เช่น 0:01:07 */
 function formatTime(t: number): string {
-  if (!Number.isFinite(t)) return '0:00:00'
-  const total = Math.max(0, Math.floor(t)) // ปัดลงเป็นวินาทีเต็ม
+  const total = Math.max(0, Math.floor(t || 0))
   const h = Math.floor(total / 3600)
   const m = Math.floor((total % 3600) / 60)
   const s = total % 60
-  return `${h}:${m.toString().padStart(2, '0')}:${s
-    .toString()
-    .padStart(2, '0')}`
+  // เอาแบบคลิป: 0:01:07 → ชั่วโมงต้องมีเสมอ
+  return `${h}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`
 }
 
 export default function Page() {
@@ -29,9 +26,7 @@ export default function Page() {
   const [error, setError] = useState<string | null>(null)
   const [result, setResult] = useState<ApiResp | null>(null)
 
-  // ใช้ URL ของ backend ที่อยู่บน Render
-  const API = 'https://asr-local-dialect-mvp.onrender.com'
-
+  const API = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8000'
 
   async function onSubmit() {
     setError(null)
@@ -121,8 +116,8 @@ export default function Page() {
           </h1>
           <p style={{ color: '#4b5563', lineHeight: 1.6, maxWidth: 720 }}>
             ระบบตัวอย่างสำหรับถอดเสียงจากไฟล์เสียงหรือวิดีโอเป็นข้อความภาษาไทย
-            และภาษาถิ่น (อีสาน, คำเมือง, ใต้) 
-            
+            และภาษาถิ่น (อีสาน, คำเมือง, ใต้) เหมาะสำหรับทำซับไตเติล
+            และเก็บบันทึกการสัมภาษณ์
           </p>
         </header>
 
@@ -372,7 +367,9 @@ export default function Page() {
 
                 {result.files?.srt && (
                   <button
-                    onClick={() => downloadText(result.files!.srt!, 'result.srt')}
+                    onClick={() =>
+                      downloadText(result.files!.srt!, 'result.srt')
+                    }
                     style={{
                       padding: '6px 10px',
                       borderRadius: 999,
@@ -388,7 +385,9 @@ export default function Page() {
                 )}
                 {result.files?.vtt && (
                   <button
-                    onClick={() => downloadText(result.files!.vtt!, 'result.vtt')}
+                    onClick={() =>
+                      downloadText(result.files!.vtt!, 'result.vtt')
+                    }
                     style={{
                       padding: '6px 10px',
                       borderRadius: 999,
@@ -420,7 +419,6 @@ export default function Page() {
                         marginBottom: 4,
                       }}
                     >
-                      {/* เปลี่ยนมาใช้เวลาแบบ h:mm:ss */}
                       {formatTime(s.start)} → {formatTime(s.end)}
                     </div>
                     <textarea
@@ -429,8 +427,8 @@ export default function Page() {
                         const newSegs = [...segments]
                         newSegs[idx] = { ...newSegs[idx], text: e.target.value }
                         setResult({
-                          ...result!,
-                          result: { ...result!.result, segments: newSegs },
+                          ...result,
+                          result: { ...result.result, segments: newSegs },
                         })
                       }}
                       style={{
