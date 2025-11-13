@@ -1,125 +1,90 @@
-# asr-local-dialect-mvp/backend/app.py
-
+# backend/app.py
 from fastapi import FastAPI, UploadFile, File, Form
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
-from typing import Optional, List, Dict, Any
+from typing import Optional, Dict, Any, List
 import tempfile, os
 
 from asr_pipeline import transcribe
-from postprocess import apply_mode
+
 
 app = FastAPI(title="ASR Local Dialect — MVP")
 
-# ======================================================
-# 1) เพิ่ม CORS ให้ครบ
-# ======================================================
+# ========================
+# CORS สำหรับ Render + Vercel
+# ========================
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
-        "*",   # << ใช้ * ไปเลยสำหรับ Render + Vercel
+        "https://asr-local-dialect-mvp.vercel.app",
+        "https://asr-local-dialect-mvp.onrender.com",
+        "http://localhost:3000",
+        "http://127.0.0.1:3000",
     ],
     allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-# ======================================================
-# 2) ฟังก์ชันแปลง segment → dict  (จำเป็นมาก!)
-# ======================================================
-def _seg_to_dict(s: Any) -> Dict[str, Any]:
-    if isinstance(s, dict):
-        start = float(s.get("start", 0.0) or 0.0)
-        end   = float(s.get("end",   0.0) or 0.0)
-        text  = (s.get("text", "") or "").strip()
-    else:
-        start = float(getattr(s, "start", 0.0) or 0.0)
-        end   = float(getattr(s, "end",   0.0) or 0.0)
-        text  = (getattr(s, "text", "") or "").strip()
-    return {"start": start, "end": end, "text": text}
 
-# ======================================================
-# 3) ฟังก์ชันสร้าง SRT
-# ======================================================
-def _to_srt(segments):
-    def ts(t):
-        h = int(t // 3600)
-        m = int((t % 3600) // 60)
-        s = int(t % 60)
-        ms = int((t - int(t)) * 1000)
-        return f"{h:02}:{m:02}:{s:02},{ms:03}"
+# ---------- Helper ----------
+def _ts_hhmmss(t: float) -> str:
+    h = int(t // 3600)
+    m = int((t % 3600) // 60)
+    s = int(t % 60)
+    return f"{h:01}:{m:02}:{s:02}"
 
-    out = []
-    for i, seg in enumerate(segments, 1):
-        out.append(str(i))
-        out.append(f"{ts(seg['start'])} --> {ts(seg['end'])}")
-        out.append(seg["text"])
-        out.append("")
-    return "\n".join(out)
 
-# ======================================================
-# 4) ฟังก์ชันสร้าง VTT
-# ======================================================
-def _to_vtt(segments):
-    def ts(t):
-        h = int(t // 3600)
-        m = int((t % 3600) // 60)
-        s = int(t % 60)
-        ms = int((t - int(t)) * 1000)
-        return f"{h:02}:{m:02}:{s:02}.{ms:03}"
+def _to_srt(segments: List[Dict]) -> str:
+    lines = []
+    for i, s in enumerate(segments, start=1):
+        lines.append(str(i))
+        lines.append(f"{_ts_hhmmss(s['start'])},000 --> {_ts_hhmmss(s['end'])},000")
+        lines.append(s["text"])
+        lines.append("")
+    return "\n".join(lines)
 
-    out = ["WEBVTT", ""]
-    for seg in segments:
-        out.append(f"{ts(seg['start'])} --> {ts(seg['end'])}")
-        out.append(seg["text"])
-        out.append("")
-    return "\n".join(out)
 
-# ======================================================
-# 5) MAIN ENDPOINT
-# ======================================================
+def _to_vtt(segments: List[Dict]) -> str:
+    lines = ["WEBVTT", ""]
+    for s in segments:
+        lines.append(f"{_ts_hhmmss(s['start'])}.000 --> {_ts_hhmmss(s['end'])}.000")
+        lines.append(s["text"])
+        lines.append("")
+    return "\n".join(lines)
+
+
+# ---------- API ----------
 @app.post("/transcribe")
 async def transcribe_api(
     file: UploadFile = File(...),
     mode: str = Form("none"),
     dialect: str = Form("isan"),
-    language: Optional[str] = Form(None)
+    language: Optional[str] = Form(None),
 ):
-    with tempfile.NamedTemporaryFile(delete=False,
-                                     suffix=os.path.splitext(file.filename or "")[1]) as tmp:
-        tmp.write(await file.read())
-        tmp_path = tmp.name
+
+    with tempfile.NamedTemporaryFile(delete=False, suffix=os.path.splitext(file.filename)[1]) as tmp:
+        raw = await file.read()
+        tmp.write(raw)
+        audio_path = tmp.name
 
     try:
-        result = transcribe(tmp_path, initial_prompt=language)
+        # call pipeline
+        segments, info = transcribe(audio_path, initial_prompt=language)
 
-        if isinstance(result, tuple):
-            segs, info = result
-            segments = [_seg_to_dict(s) for s in segs]
-            language_out = info.get("language") if isinstance(info, dict) else None
-            duration_out = info.get("duration") if isinstance(info, dict) else None
-        else:
-            segments = [_seg_to_dict(s) for s in result.get("segments", [])]
-            language_out = result.get("language")
-            duration_out = result.get("duration")
-
-        if mode in {"dialect", "standard"}:
-            segments = apply_mode(segments, mode=mode, dialect_hint=dialect)
-
-        return JSONResponse({
+        result = {
             "result": {
-                "language": language_out,
-                "duration": duration_out,
-                "segments": segments
+                "language": info.get("language") if isinstance(info, dict) else None,
+                "duration": info.get("duration") if isinstance(info, dict) else None,
+                "segments": segments,
             },
             "files": {
                 "srt": _to_srt(segments),
-                "vtt": _to_vtt(segments)
+                "vtt": _to_vtt(segments),
             }
-        })
+        }
+        return JSONResponse(result)
 
     finally:
-        try:
-            os.remove(tmp_path)
-        except:
-            pass
+        try: os.remove(audio_path)
+        except: pass

@@ -1,16 +1,38 @@
+# backend/config.py
 import os
 
 class ASRConfig:
-    name = os.getenv("ASR_MODEL_NAME", "small")
+    # =======================
+    # Render-friendly setting
+    # =======================
+    # ใช้ tiny เพื่อลด RAM (tiny ~ 75MB)
+    name = os.getenv("ASR_MODEL_NAME", "tiny")
+
+    # compute int8 = RAM ต่ำสุด
     compute = os.getenv("ASR_COMPUTE_TYPE", "int8")
-    device = os.getenv("ASR_DEVICE", "cpu")   # เพิ่มบรรทัดนี้
-    force_lang = (os.getenv("FORCE_LANG", "").strip() or None)
+
+    # ใช้ CPU เท่านั้นบน Render
+    device = os.getenv("ASR_DEVICE", "cpu")
+
+    # ไม่บังคับภาษา (ให้โมเดลเดาเอง หรือส่ง initial_prompt แทน)
+    force_lang = None
+
+    # เก็บโมเดลในโฟลเดอร์ local (Render จะ cache ให้)
     download_root = os.path.join(os.path.dirname(__file__), "models")
-    enable_multi = os.getenv("ASR_ENABLE_MULTI", "1") == "1"
-    enable_diar = os.getenv("ENABLE_DIARIZATION", "0") == "1"
-    kenlm_path = os.getenv("KENLM_ARPA_PATH", "")
-    alpha = float(os.getenv("RANK_ALPHA_ASR", "1.0"))
-    beta  = float(os.getenv("RANK_BETA_LM", "1.2"))
-    gamma = float(os.getenv("RANK_GAMMA_LEX", "0.3"))
-    delta = float(os.getenv("RANK_DELTA_PEN", "0.2"))
-    domain_whitelist = [w.strip() for w in os.getenv("DOMAIN_WHITELIST", "").split(",") if w.strip()]
+
+    # ปิด multi-profiles เพื่อลดโหลดซ้ำหลายรอบ
+    enable_multi = False
+
+    # ปิด diarization (ใช้ memory เยอะ)
+    enable_diar = False
+
+    # ปิด language model (ลด RAM)
+    kenlm_path = ""
+
+    # ปิดการ ranking เพื่อประหยัด CPU
+    alpha = 1.0
+    beta = 0.0
+    gamma = 0.0
+    delta = 0.0
+
+    domain_whitelist = []
