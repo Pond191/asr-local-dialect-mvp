@@ -8,13 +8,14 @@ type ApiResp = {
   files?: { srt?: string; vtt?: string }
 }
 
-function formatTime(t: number): string {
-  const total = Math.max(0, Math.floor(t || 0))
+// helper แปลงวินาที -> 0:01:07
+function formatTime(sec: number): string {
+  if (!Number.isFinite(sec)) sec = 0
+  const total = Math.max(0, Math.floor(sec))
   const h = Math.floor(total / 3600)
   const m = Math.floor((total % 3600) / 60)
   const s = total % 60
-  // เอาแบบคลิป: 0:01:07 → ชั่วโมงต้องมีเสมอ
-  return `${h}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`
+  return [h, m, s].map((v) => v.toString().padStart(2, '0')).join(':')
 }
 
 export default function Page() {
@@ -164,8 +165,7 @@ export default function Page() {
               onChange={(e) => setFile(e.target.files?.[0] || null)}
             />
             <span style={{ fontSize: 13, color: '#6b7280' }}>
-              ไฟล์ที่เลือก:{' '}
-              <b>{file ? file.name : 'ยังไม่ได้เลือกไฟล์'}</b>
+              ไฟล์ที่เลือก: <b>{file ? file.name : 'ยังไม่ได้เลือกไฟล์'}</b>
             </span>
           </div>
 
@@ -250,9 +250,8 @@ export default function Page() {
               }}
             />
             <p style={{ fontSize: 12, color: '#6b7280', marginTop: 4 }}>
-              ช่องนี้เป็นตัวช่วยบอกโมเดลว่าเสียงเป็นภาษาอะไร เช่น{' '}
-              <code>Thai</code>, <code>Thai / Isan dialect</code>,{' '}
-              <code>English</code> ถ้าไม่แน่ใจปล่อยค่าเดิมไว้ได้
+              ช่องนี้เป็นตัวช่วยบอกโมเดลว่าเสียงเป็นภาษาอะไร เช่น <code>Thai</code>,{' '}
+              <code>Thai / Isan dialect</code>, <code>English</code> ถ้าไม่แน่ใจปล่อยค่าเดิมไว้ได้
             </p>
           </div>
 
@@ -367,9 +366,7 @@ export default function Page() {
 
                 {result.files?.srt && (
                   <button
-                    onClick={() =>
-                      downloadText(result.files!.srt!, 'result.srt')
-                    }
+                    onClick={() => downloadText(result.files!.srt!, 'result.srt')}
                     style={{
                       padding: '6px 10px',
                       borderRadius: 999,
@@ -385,9 +382,7 @@ export default function Page() {
                 )}
                 {result.files?.vtt && (
                   <button
-                    onClick={() =>
-                      downloadText(result.files!.vtt!, 'result.vtt')
-                    }
+                    onClick={() => downloadText(result.files!.vtt!, 'result.vtt')}
                     style={{
                       padding: '6px 10px',
                       borderRadius: 999,

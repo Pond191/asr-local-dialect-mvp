@@ -1,4 +1,3 @@
-# backend/asr_pipeline.py
 import os
 from typing import List, Dict, Optional
 from faster_whisper import WhisperModel
@@ -26,9 +25,9 @@ def load_model():
     global _MODEL
     if _MODEL is None:
         os.makedirs(ASRConfig.download_root, exist_ok=True)
-        # เวอร์ชันเดิม: ไม่ใส่ device พิเศษ ปล่อยให้ faster-whisper เลือกเอง
         _MODEL = WhisperModel(
             ASRConfig.name,
+            device=ASRConfig.device,       # cpu
             compute_type=ASRConfig.compute,
             download_root=ASRConfig.download_root,
         )
@@ -36,16 +35,14 @@ def load_model():
 
 def _profiles() -> List[Dict]:
     if not ASRConfig.enable_multi:
-        return [
-            dict(
-                language=ASRConfig.force_lang,
-                vad_filter=True,
-                beam_size=5,
-                best_of=5,
-                temperature=[0.0, 0.2],
-                condition_on_previous_text=True,
-            )
-        ]
+        return [dict(
+            language=ASRConfig.force_lang,
+            vad_filter=True,
+            beam_size=5,
+            best_of=5,
+            temperature=[0.0, 0.2],
+            condition_on_previous_text=True,
+        )]
     return [
         dict(
             language=ASRConfig.force_lang or "th",
@@ -99,8 +96,8 @@ def _lex_bonus(text: str) -> float:
 
 def transcribe(audio_path: str, initial_prompt: Optional[str] = None):
     """
-    คืนค่า: (segments_list, best_info)
-    segments_list เป็น list ของ dict: {start, end, text, avg_logprob}
+    คืนค่า: (segments: List[Dict], info: Dict|None)
+    segments: [{start, end, text, avg_logprob}, ...]
     """
     model = load_model()
     best = None
@@ -111,7 +108,6 @@ def transcribe(audio_path: str, initial_prompt: Optional[str] = None):
         params = dict(prof)
         if initial_prompt:
             params["initial_prompt"] = initial_prompt
-
         segs, info = model.transcribe(audio_path, **params)
         segs = list(segs)
 
@@ -122,19 +118,15 @@ def transcribe(audio_path: str, initial_prompt: Optional[str] = None):
             + ASRConfig.beta * _lm_score(text)
             + ASRConfig.gamma * _lex_bonus(text)
         )
-
         if score > best_score:
             best, best_score, best_info = segs, score, info
 
-    out = []
+    out: List[Dict] = []
     for s in best or []:
-        out.append(
-            {
-                "start": float(getattr(s, "start", 0.0) or 0.0),
-                "end": float(getattr(s, "end", 0.0) or 0.0),
-                "text": (getattr(s, "text", "") or "").strip(),
-                "avg_logprob": float(getattr(s, "avg_logprob", 0.0) or 0.0),
-            }
-        )
-
+        out.append({
+            "start": float(getattr(s, "start", 0.0) or 0.0),
+            "end": float(getattr(s, "end", 0.0) or 0.0),
+            "text": (getattr(s, "text", "") or "").strip(),
+            "avg_logprob": float(getattr(s, "avg_logprob", 0.0) or 0.0),
+        })
     return out, best_info
