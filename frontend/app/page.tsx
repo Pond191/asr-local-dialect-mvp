@@ -27,7 +27,7 @@ export default function Page() {
   const [error, setError] = useState<string | null>(null)
   const [result, setResult] = useState<ApiResp | null>(null)
 
-  const API = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8000'
+  const API = "https://starts-skirts-increasingly-stuck.trycloudflare.com"
 
   async function onSubmit() {
     setError(null)
