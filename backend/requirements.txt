@@ -1,6 +1,19 @@
-fastapi
-uvicorn[standard]
-python-multipart
-faster-whisper
-pythainlp
-# kenlm  # optional
+# Backend Dependencies
+fastapi>=0.108.0
+uvicorn[standard]>=0.25.0
+python-multipart>=0.0.6
+
+# ASR Engine
+faster-whisper>=0.10.0
+
+# Thai NLP
+pythainlp>=4.0.0
+
+# Optional: Language Model (uncomment if needed)
+# kenlm
+
+# Logging & Monitoring
+python-json-logger>=2.0.7
+
+# Performance
+aiofiles>=23.2.1
